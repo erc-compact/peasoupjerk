@@ -138,25 +138,46 @@ public:
   }
 };
 
-class AccelerationPlan {
-  private:
-    float acc_lo;             // lowest acceleration in m/s^2
-    float acc_hi;             // highest acceleration in m/s^2
-    float tol;                // dimensionless smearning tolerance 1.1 ~ 10%
-    float pulse_width;        // minimum pulse width in seconds
-    std::size_t nsamps;       // number of samples in time series
-    float tsamp;              // sampling interval in seconds
-    float cfreq;              // reference frqeuency in Hz
-    float ch_bw;              // channel bandwidth in Hz
+// class AccelerationPlan {
+//   private:
+//     float acc_lo;             // lowest acceleration in m/s^2
+//     float acc_hi;             // highest acceleration in m/s^2
+//     float tol;                // dimensionless smearning tolerance 1.1 ~ 10%
+//     float pulse_width;        // minimum pulse width in seconds
+//     std::size_t nsamps;       // number of samples in time series
+//     float tsamp;              // sampling interval in seconds
+//     float cfreq;              // reference frqeuency in Hz
+//     float ch_bw;              // channel bandwidth in Hz
 
-public:
-  AccelerationPlan(float acc_lo, float acc_hi, float tol,
-    float pulse_width, std::size_t nsamps, float tsamp,
-    float cfreq, float ch_bw)
-    :acc_lo(acc_lo), acc_hi(acc_hi), tol(tol), pulse_width(pulse_width),
-     nsamps(nsamps), tsamp(tsamp), cfreq(cfreq), ch_bw(fabs(ch_bw)) //bandwidth is always positive here
-  {
-  }
+// public:
+//   AccelerationPlan(float acc_lo, float acc_hi, float tol,
+//     float pulse_width, std::size_t nsamps, float tsamp,
+//     float cfreq, float ch_bw)
+//     :acc_lo(acc_lo), acc_hi(acc_hi), tol(tol), pulse_width(pulse_width),
+//      nsamps(nsamps), tsamp(tsamp), cfreq(cfreq), ch_bw(fabs(ch_bw)) //bandwidth is always positive here
+//   {
+//   }
+
+
+
+bool read_acceleration_and_jerk_plan(const std::string& file_name, std::vector<double>& accel_jerk_list) {
+    std::ifstream file(file_name);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file: " << file_name << std::endl;
+        return false;
+    }
+
+    double acceleration, jerk;
+    while (file >> acceleration >> jerk) {
+        accel_jerk_list.push_back(acceleration);
+        accel_jerk_list.push_back(jerk);
+    }
+
+    file.close();
+    return true;
+}
+
+
 
   float dispersive_smear(float dm, float cdm) const
   /*

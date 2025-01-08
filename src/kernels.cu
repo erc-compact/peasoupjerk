@@ -385,6 +385,52 @@ void device_resample(float * d_idata, float * d_odata,
   ErrorChecker::check_cuda_error("Error from device_resample");
 }
 
+// The new acceleration+jerk resample kernel and host function.
+
+
+__global__ void resample_jerk_kernel(float* input_d,
+                                   float* output_d,
+                                   double* accel_jerk_list,
+                                   unsigned int size,
+                                   double offset) {
+    for (unsigned long idx = blockIdx.x * blockDim.x + threadIdx.x; idx < size; idx += blockDim.x * gridDim.x) {
+        // Extract acceleration and jerk for the current thread
+        double accel_fact = accel_jerk_list[2 * idx];       // Acceleration value
+        double jerk_fact = accel_jerk_list[2 * idx + 1];    // Jerk value
+
+        // Calculate the resampled index
+        unsigned long out_idx = round(idx + idx * (accel_fact * (idx - offset) + jerk_fact * (idx - offset) * (idx - offset)));
+
+        // Ensure the calculated index is within bounds
+        if (out_idx < size) {
+            output_d[idx] = input_d[out_idx];
+        } else {
+            output_d[idx] = 0;  // Handle out-of-bounds gracefully (set to 0 or another default value)
+        }
+    }
+}
+
+void device_resample_jerk(float* d_idata, float* d_odata,
+                          double* accel_jerk_list,
+                          size_t size, unsigned int max_threads,
+                          unsigned int max_blocks) {
+    double offset = size / 2.0; // Midpoint of the input data array for relative indexing
+
+    // Determine the number of blocks and threads
+    unsigned blocks = size / max_threads + 1;
+    if (blocks > max_blocks) {
+        blocks = max_blocks;
+    }
+
+    // Launch the kernel
+    resample_jerk_kernel<<<blocks, max_threads>>>(d_idata, d_odata, accel_jerk_list, size, offset);
+
+    // Check for CUDA errors
+    ErrorChecker::check_cuda_error("Error from device_resample_jerk");
+}
+
+
+
 //------------------peak finding-----------------//
 //defined here as (although Thrust based) requires CUDA functors
 

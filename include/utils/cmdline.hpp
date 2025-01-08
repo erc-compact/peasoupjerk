@@ -136,21 +136,34 @@ bool read_cmdline_options(CmdLineOptions& args, int argc, char **argv)
                                                 "Number of samples to read at a time during dedispersion, default: 1 million",
                                                 false, 1e6, "int", cmd);
 
-      TCLAP::ValueArg<float> arg_acc_start("", "acc_start",
-					   "First acceleration to resample to",
-					   false, 0.0, "float", cmd);
+      TCLAP::ValueArg<std::string> arg_template_jerk_file("", "template_jerk_file",
+                                                "Path to the template bank file containing acceleration and jerk values (required)", 
+                                                true, "", "string", cmd);
 
-      TCLAP::ValueArg<float> arg_acc_end("", "acc_end",
-					 "Last acceleration to resample to",
-					 false, 0.0, "float", cmd);
 
-      TCLAP::ValueArg<float> arg_acc_tol("", "acc_tol",
-					 "Acceleration smearing tolerance (1.11=10%)",
-					 false, 1.10, "float",cmd);
+      // TCLAP::ValueArg<float> arg_acc_start("", "acc_start",
+			// 		   "First acceleration to resample to",
+			// 		   false, 0.0, "float", cmd);
 
-      TCLAP::ValueArg<float> arg_acc_pulse_width("", "acc_pulse_width",
-                                                 "Minimum pulse width for which acc_tol is valid",
-						 false, 64.0, "float (us)",cmd);
+      // TCLAP::ValueArg<float> arg_acc_end("", "acc_end",
+			// 		 "Last acceleration to resample to",
+			// 		 false, 0.0, "float", cmd);
+
+      // TCLAP::ValueArg<float> arg_jerk_start("", "jerk_start",
+			// 		   "First jerk to resample to",
+			// 		   false, 0.0, "float", cmd);
+
+      // TCLAP::ValueArg<float> arg_jerk_end("", "jerk_end",
+			// 		   "last jerk to resample to",
+			// 		   false, 0.0, "float", cmd);             
+
+      // TCLAP::ValueArg<float> arg_acc_tol("", "acc_tol",
+			// 		 "Acceleration smearing tolerance (1.11=10%)",
+			// 		 false, 1.10, "float",cmd);
+
+      // TCLAP::ValueArg<float> arg_acc_pulse_width("", "acc_pulse_width",
+      //                                            "Minimum pulse width for which acc_tol is valid",
+			// 			 false, 64.0, "float (us)",cmd);
 
       TCLAP::ValueArg<float> arg_boundary_5_freq("", "boundary_5_freq",
                                                  "Frequency at which to switch from median5 to median25",

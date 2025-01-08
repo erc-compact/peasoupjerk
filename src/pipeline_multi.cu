@@ -30,6 +30,9 @@
 #include "pthread.h"
 #include <cmath>
 #include <map>
+//#include <template_jerk.hpp>
+//#include <vector>
+
 
 typedef float DedispOutputType;
 
@@ -83,28 +86,29 @@ public:
   }
 };
 
+
+
+
+
 class Worker {
 private:
   DispersionTrials<DedispOutputType>& trials;
   DMDispenser& manager;
   CmdLineOptions& args;
-  AccelerationPlan& acc_plan;
   unsigned int size;
   int device;
+  double* d_accel_jerk_list; // Pointer to GPU memory holding accel_jerk_list
   std::map<std::string,Stopwatch> timers;
 
 public:
   CandidateCollection dm_trial_cands;
 
-  Worker(DispersionTrials<DedispOutputType>& trials, DMDispenser& manager,
-	 AccelerationPlan& acc_plan, CmdLineOptions& args, unsigned int size, int device)
-    :trials(trials)
-    ,manager(manager)
-    ,acc_plan(acc_plan)
-    ,args(args)
-    ,size(size)
-    ,device(device)
-  {}
+Worker(DispersionTrials<DedispOutputType>& trials, DMDispenser& manager,
+           CmdLineOptions& args, unsigned int size, int device, double* d_accel_jerk_list)
+        : trials(trials), manager(manager), args(args), size(size), device(device),
+          d_accel_jerk_list(d_accel_jerk_list) 
+
+{}
 
   void start(void)
   {
@@ -184,12 +188,12 @@ public:
             }
       }
 
-      if (args.verbose)
-	    std::cout << "Generating accelration list" << std::endl;
-      acc_plan.generate_accel_list(tim.get_dm(), args.cdm, acc_list);
+      // if (args.verbose)
+	    // std::cout << "Generating accelration list" << std::endl;
+      // acc_plan.generate_accel_list(tim.get_dm(), args.cdm, acc_list);
 
-      if (args.verbose)
-	    std::cout << "Searching "<< acc_list.size()<< " acceleration trials for DM "<< tim.get_dm() << std::endl;
+      // if (args.verbose)
+	    // std::cout << "Searching "<< acc_list.size()<< " acceleration trials for DM "<< tim.get_dm() << std::endl;
 
       //Utils::dump_device_buffer<float>(d_tim.get_data(), d_tim.get_nsamps(), "raw_timeseries_after_padding_beg.dump");
      
@@ -238,15 +242,32 @@ public:
       //Utils::dump_device_buffer<float>(d_tim.get_data(), d_tim.get_nsamps(), "deredden_ifft.dump");
 
 
-      CandidateCollection accel_trial_cands;
-      PUSH_NVTX_RANGE("Acceleration-Loop",1)
+      // CandidateCollection accel_trial_cands;
+      // PUSH_NVTX_RANGE("Acceleration-Loop",1)
 
-      for (int jj=0;jj<acc_list.size();jj++){
-  	    if (args.verbose)
-  	      std::cout << "Resampling to "<< acc_list[jj] << " m/s/s" << std::endl;
-  	    resampler.resampleII(d_tim,d_tim_r,size,acc_list[jj]);
+      // for (int jj=0;jj<acc_list.size();jj++){
+  	  //   if (args.verbose)
+  	  //     std::cout << "Resampling to "<< acc_list[jj] << " m/s/s" << std::endl;
+  	  //   resampler.resampleII(d_tim,d_tim_r,size,acc_list[jj]);
+        
+        //resampler.resample_jerk(d_tim, d_tim_r, d_jerk_list, size);
+
 
         //Utils::dump_device_buffer<float>(d_tim_r.get_data(), d_tim_r.get_nsamps(), "resampler_out.dump");
+
+
+
+//----------------------------------------------------------------------------------------
+
+
+      unsigned int max_threads = 1024; // Kernel configuration: threads per block
+        unsigned int max_blocks = 65535; // Kernel configuration: maximum blocks
+
+        // Call the resampler kernel with acceleration and jerk pairs
+        device_resample_jerk(d_tim.get_data(), d_tim_r.get_data(), d_accel_jerk_list, size, max_threads, max_blocks);
+
+//------------------------------------------------------------------------------------------
+
 
 
   	    if (args.verbose)
@@ -401,17 +422,57 @@ int main(int argc, char **argv)
 
 
 
-  AccelerationPlan acc_plan(
-    args.acc_start, // m/s^2
-    args.acc_end,   // m/s^2
-    args.acc_tol,   // dimensionless
-    args.acc_pulse_width * 1e-6, // cmd line arg is microseconds but needs to be passed as seconds
-    size, // Number of samples in FFT. Set based on segment samples and power of 2.
-    filobj.get_tsamp(), // seconds
-    filobj.get_cfreq() * 1e6, // from header in MHz needs converted to Hz
-    filobj.get_foff() * 1e6 // from header in MHz needs converted to Hz
-    );
+  // AccelerationPlan acc_plan(
+  //   args.acc_start, // m/s^2
+  //   args.acc_end,   // m/s^2
+  //   args.acc_tol,   // dimensionless
+  //   args.acc_pulse_width * 1e-6, // cmd line arg is microseconds but needs to be passed as seconds
+  //   size, // Number of samples in FFT. Set based on segment samples and power of 2.
+  //   filobj.get_tsamp(), // seconds
+  //   filobj.get_cfreq() * 1e6, // from header in MHz needs converted to Hz
+  //   filobj.get_foff() * 1e6 // from header in MHz needs converted to Hz
+  //   );
 
+//-------------reads the output of the template bank generator whose address is given through command line------------------
+
+//--------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+  // Read acceleration and jerk values from the template bank file
+    std::vector<double> accel_jerk_list;
+    if (!read_acceleration_and_jerk_plan(args.template_jerk_file, accel_jerk_list)) {
+        throw std::runtime_error("Failed to read acceleration and jerk plan from " + args.template_jerk_file);
+    }
+
+    if (args.verbose) {
+        std::cout << "Loaded " << accel_jerk_list.size() / 2
+                  << " acceleration and jerk pairs from " << args.template_jerk_file << std::endl;
+    }
+
+    // Allocate GPU memory for accel_jerk_list
+    double* d_accel_jerk_list;
+    cudaMalloc(&d_accel_jerk_list, accel_jerk_list.size() * sizeof(double));
+    cudaMemcpy(d_accel_jerk_list, accel_jerk_list.data(), accel_jerk_list.size() * sizeof(double), cudaMemcpyHostToDevice);
+
+    // Pass d_accel_jerk_list to Worker
+    std::vector<Worker*> workers(nthreads);
+    std::vector<pthread_t> threads(nthreads);
+    DMDispenser dispenser(trials);
+    if (args.progress_bar)
+        dispenser.enable_progress_bar();
+
+    for (int ii = 0; ii < nthreads; ii++) {
+        workers[ii] = new Worker(trials, dispenser, args, size, ii, d_accel_jerk_list);
+        pthread_create(&threads[ii], NULL, launch_worker_thread, (void*)workers[ii]); 
+    }
+
+
+
+
+
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------
 
   if (args.verbose)
     std::cout << "Generating DM list" << std::endl;
