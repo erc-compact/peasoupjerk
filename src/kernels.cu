@@ -27,6 +27,7 @@
 #include <map>
 
 #define SQRT2 1.4142135623730951f
+#define SPEED_OF_LIGHT 299792458.0
 
 //--------------Harmonic summing----------------//
 
@@ -312,123 +313,106 @@ void device_form_power_series(cufftComplex* d_array_in,
 
 //-----------------time domain resampling---------------//
 
-inline __device__ unsigned long getAcceleratedIndex(double accel_fact, double size_by_2,
-						    unsigned long id){
-  return __double2ull_rn(id + accel_fact*( ((id-size_by_2)*(id-size_by_2)) - (size_by_2*size_by_2)));
+// inline __device__ unsigned long getAcceleratedIndex(double accel_fact, double size_by_2,
+// 						    unsigned long id){
+//   return __double2ull_rn(id + accel_fact*( ((id-size_by_2)*(id-size_by_2)) - (size_by_2*size_by_2)));
+// }
+
+
+// inline __device__ unsigned long getAcceleratedIndexII(double accel_fact, double size,
+// 						      unsigned long id){
+//   return __double2ull_rn(id + id*accel_fact*(id-size));
+// }
+
+
+// __global__ void resample_kernel(float* input_d,
+// 				float* output_d,
+// 				double accel_fact,
+// 				size_t size,
+// 				double size_by_2,
+// 				size_t start_idx)
+// {
+//   unsigned long idx = threadIdx.x + blockIdx.x * blockDim.x + start_idx;
+//   if (idx>=size)
+//     return;
+//   unsigned long idx_read = getAcceleratedIndex(accel_fact,size_by_2,idx);
+//   output_d[idx] = input_d[idx_read];
+// }
+
+
+// __global__ void resample_kernelII(float* input_d,
+// 				  float* output_d,
+// 				  double accel_fact,
+// 				  double size)
+
+// {
+//   for( unsigned long idx = blockIdx.x*blockDim.x + threadIdx.x ; idx < size ; idx += blockDim.x*gridDim.x )
+//   {
+//     unsigned long out_idx = getAcceleratedIndexII(accel_fact,size,idx);
+//     output_d[idx] = input_d[out_idx];
+//   }
+// }
+
+// void device_resampleII(float * d_idata, float * d_odata,
+//                      size_t size, float a,
+//                      float tsamp, unsigned int max_threads,
+//                      unsigned int max_blocks)
+// {
+
+//   double accel_fact = ((a*tsamp) / (2 * 299792458.0));
+//   unsigned blocks = size/max_threads + 1;
+//   if (blocks > max_blocks)
+//     blocks = max_blocks;
+//   resample_kernelII<<< blocks,max_threads >>>(d_idata, d_odata,
+// 					      accel_fact,
+// 					      (double) size);
+//   ErrorChecker::check_cuda_error("Error from device_resampleII");
+// }
+
+// void device_resample(float * d_idata, float * d_odata,
+// 		     size_t size, float a,
+// 		     float tsamp, unsigned int max_threads,
+// 		     unsigned int max_blocks)
+// {
+//   double accel_fact = ((a*tsamp) / (2 * 299792458.0));
+//   double size_by_2  = (double)size/2.0;
+//   BlockCalculator calc(size,max_blocks,max_threads);
+//   for (int ii=0;ii<calc.size();ii++)
+//     resample_kernel<<< calc[ii].blocks,max_threads >>>(d_idata, d_odata,
+// 						       accel_fact,
+// 						       size,
+// 						       size_by_2,
+// 						       calc[ii].data_idx);
+//   ErrorChecker::check_cuda_error("Error from device_resample");
+// }
+
+
+//-----------------------------------------------------------------------
+
+//New resampler kernel thaking both acceleration and jerk parameters
+
+
+__device__ unsigned long getAcceleratedJerkedIndex(double accel_factor, double jerk_factor, double size, unsigned long idx) {
+  return __double2ull_rn(idx + idx * accel_factor * (idx - size) + 0.5 * jerk_factor * (idx - size) * (idx - size));
 }
 
-
-inline __device__ unsigned long getAcceleratedIndexII(double accel_fact, double size,
-						      unsigned long id){
-  return __double2ull_rn(id + id*accel_fact*(id-size));
-}
-
-
-__global__ void resample_kernel(float* input_d,
-				float* output_d,
-				double accel_fact,
-				size_t size,
-				double size_by_2,
-				size_t start_idx)
-{
-  unsigned long idx = threadIdx.x + blockIdx.x * blockDim.x + start_idx;
-  if (idx>=size)
-    return;
-  unsigned long idx_read = getAcceleratedIndex(accel_fact,size_by_2,idx);
-  output_d[idx] = input_d[idx_read];
-}
-
-
-__global__ void resample_kernelII(float* input_d,
-				  float* output_d,
-				  double accel_fact,
-				  double size)
-
-{
-  for( unsigned long idx = blockIdx.x*blockDim.x + threadIdx.x ; idx < size ; idx += blockDim.x*gridDim.x )
-  {
-    unsigned long out_idx = getAcceleratedIndexII(accel_fact,size,idx);
-    output_d[idx] = input_d[out_idx];
+__global__ void resample_acc_jerk_kernel(float* input_d, float* output_d, double accel_factor, double jerk_factor, size_t size) {
+  for (unsigned long idx = blockIdx.x * blockDim.x + threadIdx.x; idx < size; idx += blockDim.x * gridDim.x) {
+      unsigned long out_idx = getAcceleratedJerkedIndex(accel_factor, jerk_factor, size, idx);
+      output_d[idx] = input_d[out_idx];
   }
 }
 
-void device_resampleII(float * d_idata, float * d_odata,
-                     size_t size, float a,
-                     float tsamp, unsigned int max_threads,
-                     unsigned int max_blocks)
-{
-
-  double accel_fact = ((a*tsamp) / (2 * 299792458.0));
-  unsigned blocks = size/max_threads + 1;
-  if (blocks > max_blocks)
-    blocks = max_blocks;
-  resample_kernelII<<< blocks,max_threads >>>(d_idata, d_odata,
-					      accel_fact,
-					      (double) size);
-  ErrorChecker::check_cuda_error("Error from device_resampleII");
+void device_resample_acc_jerk(float* d_idata, float* d_odata, size_t size, float acc_value, float jerk_value, float tsamp, unsigned int max_threads, unsigned int max_blocks) {
+  double accel_factor = ((acc_value * tsamp) / (2 * SPEED_OF_LIGHT));
+  double jerk_factor = ((jerk_value * tsamp * tsamp) / (6 * SPEED_OF_LIGHT));
+  unsigned blocks = size / max_threads + 1;
+  if (blocks > max_blocks) blocks = max_blocks;
+  resample_acc_jerk_kernel<<<blocks, max_threads>>>(d_idata, d_odata, accel_factor, jerk_factor, size);
+  ErrorChecker::check_cuda_error("Error from device_resample_acc_jerk");
 }
 
-void device_resample(float * d_idata, float * d_odata,
-		     size_t size, float a,
-		     float tsamp, unsigned int max_threads,
-		     unsigned int max_blocks)
-{
-  double accel_fact = ((a*tsamp) / (2 * 299792458.0));
-  double size_by_2  = (double)size/2.0;
-  BlockCalculator calc(size,max_blocks,max_threads);
-  for (int ii=0;ii<calc.size();ii++)
-    resample_kernel<<< calc[ii].blocks,max_threads >>>(d_idata, d_odata,
-						       accel_fact,
-						       size,
-						       size_by_2,
-						       calc[ii].data_idx);
-  ErrorChecker::check_cuda_error("Error from device_resample");
-}
-
-// The new acceleration+jerk resample kernel and host function.
-
-
-__global__ void resample_jerk_kernel(float* input_d,
-                                   float* output_d,
-                                   double* accel_jerk_list,
-                                   unsigned int size,
-                                   double offset) {
-    for (unsigned long idx = blockIdx.x * blockDim.x + threadIdx.x; idx < size; idx += blockDim.x * gridDim.x) {
-        // Extract acceleration and jerk for the current thread
-        double accel_fact = accel_jerk_list[2 * idx];       // Acceleration value
-        double jerk_fact = accel_jerk_list[2 * idx + 1];    // Jerk value
-
-        // Calculate the resampled index
-        unsigned long out_idx = round(idx + idx * (accel_fact * (idx - offset) + jerk_fact * (idx - offset) * (idx - offset)));
-
-        // Ensure the calculated index is within bounds
-        if (out_idx < size) {
-            output_d[idx] = input_d[out_idx];
-        } else {
-            output_d[idx] = 0;  // Handle out-of-bounds gracefully (set to 0 or another default value)
-        }
-    }
-}
-
-void device_resample_jerk(float* d_idata, float* d_odata,
-                          double* accel_jerk_list,
-                          size_t size, unsigned int max_threads,
-                          unsigned int max_blocks) {
-    double offset = size / 2.0; // Midpoint of the input data array for relative indexing
-
-    // Determine the number of blocks and threads
-    unsigned blocks = size / max_threads + 1;
-    if (blocks > max_blocks) {
-        blocks = max_blocks;
-    }
-
-    // Launch the kernel
-    resample_jerk_kernel<<<blocks, max_threads>>>(d_idata, d_odata, accel_jerk_list, size, offset);
-
-    // Check for CUDA errors
-    ErrorChecker::check_cuda_error("Error from device_resample_jerk");
-}
-
+//----------------------------------------------------------------------
 
 
 //------------------peak finding-----------------//

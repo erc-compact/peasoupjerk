@@ -30,9 +30,6 @@
 #include "pthread.h"
 #include <cmath>
 #include <map>
-//#include <template_jerk.hpp>
-//#include <vector>
-
 
 typedef float DedispOutputType;
 
@@ -86,8 +83,29 @@ public:
   }
 };
 
+// New Acceleration and Jerk plan class ----------------------------------------------------------------------------------- 
+
+class AccelJerkPlan {
+  public:
+      std::vector<float> acc_values;
+      std::vector<float> jerk_values;
+  
+      AccelJerkPlan(const std::string& filename) {
+          std::ifstream file(filename);
+          if (!file) {
+              throw std::runtime_error("Cannot open Acc_Jerk_template file: " + filename);
+          }
+          float acc, jerk;
+          while (file >> acc >> jerk) {
+              acc_values.push_back(acc);
+              jerk_values.push_back(jerk);
+          }
+          file.close();
+      }
+  };
 
 
+//-----------------------------------------------------------------------------------------------------------------------
 
 
 class Worker {
@@ -95,20 +113,23 @@ private:
   DispersionTrials<DedispOutputType>& trials;
   DMDispenser& manager;
   CmdLineOptions& args;
+  AccelJerkPlan& acc_jerk_plan; // New: Reference to acceleration-jerk plan
   unsigned int size;
   int device;
-  double* d_accel_jerk_list; // Pointer to GPU memory holding accel_jerk_list
   std::map<std::string,Stopwatch> timers;
 
 public:
   CandidateCollection dm_trial_cands;
 
-Worker(DispersionTrials<DedispOutputType>& trials, DMDispenser& manager,
-           CmdLineOptions& args, unsigned int size, int device, double* d_accel_jerk_list)
-        : trials(trials), manager(manager), args(args), size(size), device(device),
-          d_accel_jerk_list(d_accel_jerk_list) 
-
-{}
+  Worker(DispersionTrials<DedispOutputType>& trials, DMDispenser& manager,
+    AccelJerkPlan& acc_jerk_plan, CmdLineOptions& args, unsigned int size, int device)
+    :trials(trials)
+    ,manager(manager)
+    ,acc_jerk_plan(acc_jerk_plan)  // Store reference to acceleration-jerk plan
+    ,args(args)
+    ,size(size)
+    ,device(device)
+  {}
 
   void start(void)
   {
@@ -195,6 +216,12 @@ Worker(DispersionTrials<DedispOutputType>& trials, DMDispenser& manager,
       // if (args.verbose)
 	    // std::cout << "Searching "<< acc_list.size()<< " acceleration trials for DM "<< tim.get_dm() << std::endl;
 
+      if (args.verbose)
+          std::cout << "Processing " << acc_jerk_plan.acc_values.size()
+              << " acceleration-jerk pairs for DM " << tim.get_dm() << std::endl;
+
+
+
       //Utils::dump_device_buffer<float>(d_tim.get_data(), d_tim.get_nsamps(), "raw_timeseries_after_padding_beg.dump");
      
 
@@ -242,32 +269,29 @@ Worker(DispersionTrials<DedispOutputType>& trials, DMDispenser& manager,
       //Utils::dump_device_buffer<float>(d_tim.get_data(), d_tim.get_nsamps(), "deredden_ifft.dump");
 
 
-      // CandidateCollection accel_trial_cands;
-      // PUSH_NVTX_RANGE("Acceleration-Loop",1)
+      CandidateCollection accel_trial_cands;
+      PUSH_NVTX_RANGE("Acceleration-Loop",1)
 
       // for (int jj=0;jj<acc_list.size();jj++){
   	  //   if (args.verbose)
   	  //     std::cout << "Resampling to "<< acc_list[jj] << " m/s/s" << std::endl;
   	  //   resampler.resampleII(d_tim,d_tim_r,size,acc_list[jj]);
-        
-        //resampler.resample_jerk(d_tim, d_tim_r, d_jerk_list, size);
+
+
+      for (size_t jj = 0; jj < acc_jerk_plan.acc_values.size(); jj++) {
+        float acc_value = acc_jerk_plan.acc_values[jj];
+        float jerk_value = acc_jerk_plan.jerk_values[jj];
+
+        if (args.verbose)
+          std::cout << "Resampling to acc: " << acc_value << " m/s^2, jerk: " << jerk_value << " m/s^3" << std::endl;
+
+          resampler.resample_acc_jerk(d_tim, d_tim_r, size, acc_value, jerk_value);
+
+
+
 
 
         //Utils::dump_device_buffer<float>(d_tim_r.get_data(), d_tim_r.get_nsamps(), "resampler_out.dump");
-
-
-
-//----------------------------------------------------------------------------------------
-
-
-      unsigned int max_threads = 1024; // Kernel configuration: threads per block
-        unsigned int max_blocks = 65535; // Kernel configuration: maximum blocks
-
-        // Call the resampler kernel with acceleration and jerk pairs
-        device_resample_jerk(d_tim.get_data(), d_tim_r.get_data(), d_accel_jerk_list, size, max_threads, max_blocks);
-
-//------------------------------------------------------------------------------------------
-
 
 
   	    if (args.verbose)
@@ -299,7 +323,7 @@ Worker(DispersionTrials<DedispOutputType>& trials, DMDispenser& manager,
 
   	    if (args.verbose)
   	      std::cout << "Finding peaks" << std::endl;
-  	    SpectrumCandidates trial_cands(tim.get_dm(),ii,acc_list[jj]);
+  	    SpectrumCandidates trial_cands(tim.get_dm(),jj,acc_value);
   	    cand_finder.find_candidates(pspec,trial_cands);
   	    cand_finder.find_candidates(sums,trial_cands);
 
@@ -433,46 +457,10 @@ int main(int argc, char **argv)
   //   filobj.get_foff() * 1e6 // from header in MHz needs converted to Hz
   //   );
 
-//-------------reads the output of the template bank generator whose address is given through command line------------------
 
-//--------------------------------------------------------------------------------------------------------------------------------------------
-
+    AccelJerkPlan acc_jerk_plan(args.acc_jerk_file);
 
 
-  // Read acceleration and jerk values from the template bank file
-    std::vector<double> accel_jerk_list;
-    if (!read_acceleration_and_jerk_plan(args.template_jerk_file, accel_jerk_list)) {
-        throw std::runtime_error("Failed to read acceleration and jerk plan from " + args.template_jerk_file);
-    }
-
-    if (args.verbose) {
-        std::cout << "Loaded " << accel_jerk_list.size() / 2
-                  << " acceleration and jerk pairs from " << args.template_jerk_file << std::endl;
-    }
-
-    // Allocate GPU memory for accel_jerk_list
-    double* d_accel_jerk_list;
-    cudaMalloc(&d_accel_jerk_list, accel_jerk_list.size() * sizeof(double));
-    cudaMemcpy(d_accel_jerk_list, accel_jerk_list.data(), accel_jerk_list.size() * sizeof(double), cudaMemcpyHostToDevice);
-
-    // Pass d_accel_jerk_list to Worker
-    std::vector<Worker*> workers(nthreads);
-    std::vector<pthread_t> threads(nthreads);
-    DMDispenser dispenser(trials);
-    if (args.progress_bar)
-        dispenser.enable_progress_bar();
-
-    for (int ii = 0; ii < nthreads; ii++) {
-        workers[ii] = new Worker(trials, dispenser, args, size, ii, d_accel_jerk_list);
-        pthread_create(&threads[ii], NULL, launch_worker_thread, (void*)workers[ii]); 
-    }
-
-
-
-
-
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------
 
   if (args.verbose)
     std::cout << "Generating DM list" << std::endl;

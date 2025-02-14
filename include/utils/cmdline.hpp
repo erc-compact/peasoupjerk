@@ -16,12 +16,13 @@ struct CmdLineOptions {
   float dm_tol;
   float dm_pulse_width;
   std::string dm_file;
+  std::string acc_jerk_file; // New field for acceleration & jerk
   int dedisp_gulp;
   float host_ram_limit_gb;
-  float acc_start;
-  float acc_end;
-  float acc_tol;
-  float acc_pulse_width;
+  // float acc_start;
+  // float acc_end;
+  // float acc_tol;
+  // float acc_pulse_width;
   float boundary_5_freq;
   float boundary_25_freq;
   int nharmonics;
@@ -136,11 +137,6 @@ bool read_cmdline_options(CmdLineOptions& args, int argc, char **argv)
                                                 "Number of samples to read at a time during dedispersion, default: 1 million",
                                                 false, 1e6, "int", cmd);
 
-      TCLAP::ValueArg<std::string> arg_template_jerk_file("", "template_jerk_file",
-                                                "Path to the template bank file containing acceleration and jerk values (required)", 
-                                                true, "", "string", cmd);
-
-
       // TCLAP::ValueArg<float> arg_acc_start("", "acc_start",
 			// 		   "First acceleration to resample to",
 			// 		   false, 0.0, "float", cmd);
@@ -149,14 +145,6 @@ bool read_cmdline_options(CmdLineOptions& args, int argc, char **argv)
 			// 		 "Last acceleration to resample to",
 			// 		 false, 0.0, "float", cmd);
 
-      // TCLAP::ValueArg<float> arg_jerk_start("", "jerk_start",
-			// 		   "First jerk to resample to",
-			// 		   false, 0.0, "float", cmd);
-
-      // TCLAP::ValueArg<float> arg_jerk_end("", "jerk_end",
-			// 		   "last jerk to resample to",
-			// 		   false, 0.0, "float", cmd);             
-
       // TCLAP::ValueArg<float> arg_acc_tol("", "acc_tol",
 			// 		 "Acceleration smearing tolerance (1.11=10%)",
 			// 		 false, 1.10, "float",cmd);
@@ -164,6 +152,14 @@ bool read_cmdline_options(CmdLineOptions& args, int argc, char **argv)
       // TCLAP::ValueArg<float> arg_acc_pulse_width("", "acc_pulse_width",
       //                                            "Minimum pulse width for which acc_tol is valid",
 			// 			 false, 64.0, "float (us)",cmd);
+
+
+      TCLAP::ValueArg<std::string> arg_acc_jerk_file("", "acc_jerk_file",
+                                                         "Path to Acc_Jerk_template file containing acceleration and jerk parameters",
+                                                          false, "", "string", cmd);
+
+
+
 
       TCLAP::ValueArg<float> arg_boundary_5_freq("", "boundary_5_freq",
                                                  "Frequency at which to switch from median5 to median25",
@@ -228,11 +224,12 @@ bool read_cmdline_options(CmdLineOptions& args, int argc, char **argv)
       args.dm_tol            = arg_dm_tol.getValue();
       args.dm_pulse_width    = arg_dm_pulse_width.getValue();
       args.host_ram_limit_gb = arg_host_ram_limit_gb.getValue();
-      args.dedisp_gulp       = arg_dedisp_gulp.getValue();
-      args.acc_start         = arg_acc_start.getValue();
-      args.acc_end           = arg_acc_end.getValue();
-      args.acc_tol           = arg_acc_tol.getValue();
-      args.acc_pulse_width   = arg_acc_pulse_width.getValue();
+      // args.dedisp_gulp       = arg_dedisp_gulp.getValue();
+      // args.acc_start         = arg_acc_start.getValue();
+      // args.acc_end           = arg_acc_end.getValue();
+      // args.acc_tol           = arg_acc_tol.getValue();
+      // args.acc_pulse_width   = arg_acc_pulse_width.getValue();
+      args.acc_jerk_file = arg_acc_jerk_file.getValue();
       args.boundary_5_freq   = arg_boundary_5_freq.getValue();
       args.boundary_25_freq  = arg_boundary_25_freq.getValue();
       args.nharmonics        = arg_nharmonics.getValue();
@@ -323,10 +320,10 @@ bool read_ffa_cmdline_options(FFACmdLineOptions& args, int argc, char **argv)
       args.killfilename      = arg_killfilename.getValue();
       args.max_num_threads   = arg_max_num_threads.getValue();
       args.nstreams          = arg_nstreams.getValue();
-      //args.dm_start          = arg_dm_start.getValue();
-      //args.dm_end            = arg_dm_end.getValue();
-      //args.dm_tol            = arg_dm_tol.getValue();
-      //args.dm_pulse_width    = arg_dm_pulse_width.getValue();
+      args.dm_start          = arg_dm_start.getValue();
+      args.dm_end            = arg_dm_end.getValue();
+      args.dm_tol            = arg_dm_tol.getValue();
+      args.dm_pulse_width    = arg_dm_pulse_width.getValue();
       args.p_start           = arg_p_start.getValue();
       args.p_end             = arg_p_end.getValue();
       args.min_dc            = arg_min_dc.getValue();
