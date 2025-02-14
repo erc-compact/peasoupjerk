@@ -224,7 +224,7 @@ bool read_cmdline_options(CmdLineOptions& args, int argc, char **argv)
       args.dm_tol            = arg_dm_tol.getValue();
       args.dm_pulse_width    = arg_dm_pulse_width.getValue();
       args.host_ram_limit_gb = arg_host_ram_limit_gb.getValue();
-      // args.dedisp_gulp       = arg_dedisp_gulp.getValue();
+       args.dedisp_gulp       = arg_dedisp_gulp.getValue();
       // args.acc_start         = arg_acc_start.getValue();
       // args.acc_end           = arg_acc_end.getValue();
       // args.acc_tol           = arg_acc_tol.getValue();

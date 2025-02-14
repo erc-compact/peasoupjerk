@@ -389,7 +389,7 @@ void device_form_power_series(cufftComplex* d_array_in,
 
 //-----------------------------------------------------------------------
 
-//New resampler kernel thaking both acceleration and jerk parameters
+//New resampler kernel taking both acceleration and jerk parameters
 
 
 __device__ unsigned long getAcceleratedJerkedIndex(double accel_factor, double jerk_factor, double size, unsigned long idx) {
