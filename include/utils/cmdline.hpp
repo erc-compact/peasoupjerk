@@ -282,7 +282,7 @@ bool read_ffa_cmdline_options(FFACmdLineOptions& args, int argc, char **argv)
 
            
 
-      /*TCLAP::ValueArg<float> arg_dm_start("", "dm_start",
+      TCLAP::ValueArg<float> arg_dm_start("", "dm_start",
                                           "First DM to dedisperse to",
                                           false, 0.0, "float", cmd);
 
@@ -296,7 +296,7 @@ bool read_ffa_cmdline_options(FFACmdLineOptions& args, int argc, char **argv)
 
       TCLAP::ValueArg<float> arg_dm_pulse_width("", "dm_pulse_width",
                                                 "Minimum pulse width for which dm_tol is valid",
-                                                false, 64.0, "float (us)",cmd);*/
+                                                false, 64.0, "float (us)",cmd);
 
       TCLAP::ValueArg<float> arg_p_start("", "p_start",
 					 "Start period for FFA search",

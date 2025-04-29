@@ -101,10 +101,10 @@ public:
     search_options.append(XML::Element("dm_end",args.dm_end));
     search_options.append(XML::Element("dm_tol",args.dm_tol));
     search_options.append(XML::Element("dm_pulse_width",args.dm_pulse_width));
-    search_options.append(XML::Element("acc_start",args.acc_start));
-    search_options.append(XML::Element("acc_end",args.acc_end));
-    search_options.append(XML::Element("acc_tol",args.acc_tol));
-    search_options.append(XML::Element("acc_pulse_width",args.acc_pulse_width));
+    // search_options.append(XML::Element("acc_start",args.acc_start));
+    // search_options.append(XML::Element("acc_end",args.acc_end));
+    // search_options.append(XML::Element("acc_tol",args.acc_tol));
+    // search_options.append(XML::Element("acc_pulse_width",args.acc_pulse_width));
     search_options.append(XML::Element("boundary_5_freq",args.boundary_5_freq));
     search_options.append(XML::Element("boundary_25_freq",args.boundary_25_freq));
     search_options.append(XML::Element("nharmonics",args.nharmonics));
@@ -118,6 +118,25 @@ public:
     search_options.append(XML::Element("progress_bar",args.progress_bar));
     root.append(search_options);
   }
+
+    // ——— embed the accel+jerk list directly from the file ———
+    if (!args.acc_jerk_file.empty()) {
+      XML::Element aj_trials("acceleration_jerk_trials");
+      std::ifstream ajf(args.acc_jerk_file);
+      float acc, jerk;
+      size_t id = 0;
+      while (ajf >> acc >> jerk) {
+        XML::Element trial("trial");
+        trial.add_attribute("id", id++);
+        std::ostringstream oss;
+        oss << format_float_to_precision(acc,4)
+            << "," << format_float_to_precision(jerk,4);
+        trial.set_text(oss.str());
+        aj_trials.append(trial);
+      }
+      root.append(aj_trials);
+    }
+  
 
   void add_misc_info(void){
     XML::Element info("misc_info");
