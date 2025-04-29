@@ -131,6 +131,15 @@ void device_resampleII(float * d_idata,
                      unsigned int block_size,
                      unsigned int max_blocks);
 
+void device_resample_acc_jerk(float*        d_idata,
+                              float*        d_odata,
+                              size_t        size,
+                              float         acc_value,
+                              float         jerk_value,
+                              float         tsamp,
+                              unsigned int  max_threads,
+                              unsigned int  max_blocks);                   
+
 int device_find_peaks(int n,
 		      int start_index,
 		      float * d_dat,
