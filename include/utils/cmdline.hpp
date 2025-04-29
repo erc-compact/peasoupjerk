@@ -2,6 +2,7 @@
 #include <tclap/CmdLine.h>
 #include <string>
 #include <iostream>
+#include<ctime>
 
 struct CmdLineOptions {
   std::string infilename;

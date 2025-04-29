@@ -30,6 +30,8 @@
 #include "pthread.h"
 #include <cmath>
 #include <map>
+#include <sstream>
+#include <stdexcept>
 
 typedef float DedispOutputType;
 
@@ -85,24 +87,33 @@ public:
 
 // New Acceleration and Jerk plan class ----------------------------------------------------------------------------------- 
 
+struct AccelJerk {
+  float acc;
+  float jerk;
+};
+
 class AccelJerkPlan {
-  public:
-      std::vector<float> acc_values;
-      std::vector<float> jerk_values;
-  
-      AccelJerkPlan(const std::string& filename) {
-          std::ifstream file(filename);
-          if (!file) {
-              throw std::runtime_error("Cannot open Acc_Jerk_template file: " + filename);
-          }
-          float acc, jerk;
-          while (file >> acc >> jerk) {
-              acc_values.push_back(acc);
-              jerk_values.push_back(jerk);
-          }
-          file.close();
+public:
+  std::vector<AccelJerk> trials;
+
+  AccelJerkPlan(const std::string& filename) {
+      std::ifstream file(filename);
+      if (!file) {
+          throw std::runtime_error("Cannot open Acc_Jerk_template file: " + filename);
       }
-  };
+      std::string line;
+      while (std::getline(file, line)) {
+          if (line.empty()) continue;
+          std::istringstream iss(line);
+          AccelJerk aj{0.0f, 0.0f};
+          // read acceleration; if missing, stays 0
+          iss >> aj.acc;
+          // read jerk; if missing, stay 0
+          if (!(iss >> aj.jerk)) aj.jerk = 0.0f;
+          trials.push_back(aj);
+      }
+  }
+};
 
 
 //-----------------------------------------------------------------------------------------------------------------------
@@ -217,7 +228,7 @@ public:
 	    // std::cout << "Searching "<< acc_list.size()<< " acceleration trials for DM "<< tim.get_dm() << std::endl;
 
       if (args.verbose)
-          std::cout << "Processing " << acc_jerk_plan.acc_values.size()
+        std::cout << "Processing " << acc_jerk_plan.trials.size()
               << " acceleration-jerk pairs for DM " << tim.get_dm() << std::endl;
 
 
@@ -278,14 +289,17 @@ public:
   	  //   resampler.resampleII(d_tim,d_tim_r,size,acc_list[jj]);
 
 
-      for (size_t jj = 0; jj < acc_jerk_plan.acc_values.size(); jj++) {
-        float acc_value = acc_jerk_plan.acc_values[jj];
-        float jerk_value = acc_jerk_plan.jerk_values[jj];
-
+      for (size_t jj = 0; jj < acc_jerk_plan.trials.size(); ++jj) {
+        const auto &aj = acc_jerk_plan.trials[jj];
+        float acc_value  = aj.acc;
+        float jerk_value = aj.jerk;
+    
         if (args.verbose)
-          std::cout << "Resampling to acc: " << acc_value << " m/s^2, jerk: " << jerk_value << " m/s^3" << std::endl;
-
-          resampler.resample_acc_jerk(d_tim, d_tim_r, size, acc_value, jerk_value);
+            std::cout << "Resampling to acc: " << acc_value
+                      << " m/s^2, jerk: " << jerk_value << " m/s^3"
+                      << std::endl;
+    
+        resampler.resample_acc_jerk(d_tim, d_tim_r, size, acc_value, jerk_value);
 
 
 
@@ -544,7 +558,7 @@ int main(int argc, char **argv)
       dispenser.enable_progress_bar();
 
     for (int ii=0;ii<nthreads;ii++){
-      workers[ii] = (new Worker(trials,dispenser,acc_plan,args,size,ii));
+      workers[ii] = new Worker(trials, dispenser, acc_jerk_plan, args, size, ii);
       pthread_create(&threads[ii], NULL, launch_worker_thread, (void*) workers[ii]);
     }
 
@@ -608,9 +622,9 @@ int main(int argc, char **argv)
   stats.add_segment_parameters(filobj);
   stats.add_dm_list(full_dm_list);
 
-  std::vector<float> acc_list;
-  acc_plan.generate_accel_list(args.cdm, args.cdm, acc_list);
-  stats.add_acc_list(acc_list, args.cdm);
+  // std::vector<float> acc_list;
+  // acc_plan.generate_accel_list(args.cdm, args.cdm, acc_list);
+  // stats.add_acc_list(acc_list, args.cdm);
 
   std::vector<int> device_idxs;
   for (int device_idx=0;device_idx<nthreads;device_idx++)
