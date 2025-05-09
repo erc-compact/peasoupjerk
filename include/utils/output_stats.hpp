@@ -201,7 +201,7 @@ public:
   {
     XML::Element cands("candidates");
     for (size_t i=0; i<candidates.size(); ++i) {
-      const auto& C = candidates[i];
+       auto& C = candidates[i];
       XML::Element cand("candidate");
       cand.add_attribute("id", i);
       cand.append(XML::Element("period",          1.0/C.freq));
@@ -227,7 +227,7 @@ public:
   {
     XML::Element cands("candidates");
     for (size_t i=0; i<candidates.size(); ++i) {
-      const auto& C = candidates[i];
+       auto& C = candidates[i];
       XML::Element cand("candidate");
       cand.add_attribute("id", i);
       cand.append(XML::Element("period",     1.0/C.freq));
