@@ -78,7 +78,7 @@ public:
     root.append(hdr_el);
   }
 
-  void add_segment_parameters(const SigprocFilterbank& f) {
+  void add_segment_parameters( SigprocFilterbank& f) {
     XML::Element seg("segment_parameters");
     seg.append(XML::Element("segment_start_sample", f.get_start_sample()));
     seg.append(XML::Element("segment_nsamples",     f.get_effective_nsamps()));
@@ -196,7 +196,7 @@ public:
     root.append(acc_trials);
   }
 
-  void add_candidates(const std::vector<Candidate>& candidates,
+  void add_candidates(std::vector<Candidate>& candidates,
                       const std::map<unsigned,long int>& byte_map)
   {
     XML::Element cands("candidates");
@@ -222,7 +222,7 @@ public:
     root.append(cands);
   }
 
-  void add_candidates(const std::vector<Candidate>& candidates,
+  void add_candidates( std::vector<Candidate>& candidates,
                       const std::map<int,std::string>& filenames)
   {
     XML::Element cands("candidates");
