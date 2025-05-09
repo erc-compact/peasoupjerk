@@ -266,7 +266,7 @@ public:
       mkdir(output_dir.c_str(), 0777);
   }
 
-  void write_binary(const std::vector<Candidate>& candidates,
+  void write_binary( std::vector<Candidate>& candidates,
                     const std::string& filename)
   {
     char actual[PATH_MAX];
