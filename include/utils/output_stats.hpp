@@ -286,7 +286,7 @@ public:
         fwrite(&candidates[i].fold[0], sizeof(float), nb*ni, fo);
       }
       std::vector<CandidatePOD> dets;
-      C.collect_candidates(dets);
+      candidates[i].collect_candidates(dets);
       int nd = dets.size();
       fwrite(&nd, sizeof(int),1,fo);
       fwrite(&dets[0], sizeof(CandidatePOD), nd, fo);
