@@ -21,7 +21,7 @@ FFASTER_INCLUDES = -I${FFASTER_DIR}/include -L${FFASTER_DIR}/lib -lffaster
 
 # compiler flags
 #Edit the following line to include the correct architecture for your GPU
-NVCC_COMP_FLAGS = -gencode arch=compute_89,code=sm_89 -gencode arch=compute_75,code=sm_75
+NVCC_COMP_FLAGS = -gencode arch=compute_89,code=sm_89 -gencode arch=compute_75,code=sm_75 -gencode arch=compute_86,code=sm_86
 NVCC_FFA_COMP_FLAGS = 
 NVCCFLAGS  = ${UCFLAGS} ${OPTIMISE} ${NVCC_COMP_FLAGS} -lineinfo --machine 64 
 NVCCFLAGS_FFA  = ${UCFLAGS} ${OPTIMISE} ${NVCC_FFA_COMP_FLAGS} -lineinfo --machine 64 -Xcompiler ${DEBUG}
