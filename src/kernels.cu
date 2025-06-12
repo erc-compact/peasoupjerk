@@ -399,7 +399,12 @@ __device__ unsigned long getAcceleratedJerkedIndex(double accel_factor, double j
 __global__ void resample_acc_jerk_kernel(float* input_d, float* output_d, double accel_factor, double jerk_factor, size_t size) {
   for (unsigned long idx = blockIdx.x * blockDim.x + threadIdx.x; idx < size; idx += blockDim.x * gridDim.x) {
       unsigned long out_idx = getAcceleratedJerkedIndex(accel_factor, jerk_factor, size, idx);
+      //**boundary check */
+      if(out_idx < size){
       output_d[idx] = input_d[out_idx];
+    } else {
+      output_d[idx]=0.0f;
+    }
   }
 }
 
